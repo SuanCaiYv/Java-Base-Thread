@@ -134,8 +134,7 @@ public class NioTcpMultiThread {
                 System.out.println("连接已关闭");
                 try {
                     socketSelectionKey.channel().close();
-                } catch (IOException e) {
-                    ;
+                } catch (IOException ignored) {
                 }
                 return ;
             }
