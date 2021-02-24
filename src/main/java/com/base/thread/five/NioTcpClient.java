@@ -17,7 +17,8 @@ public class NioTcpClient {
         SocketChannel socketChannel = SocketChannel.open(new InetSocketAddress("127.0.0.1", 8190));
         ByteBuffer byteBuffer = ByteBuffer.allocate(1024 * 5);
         for (int i = 0; i < 10; ++ i) {
-            socketChannel.write(ByteBuffer.wrap(UUID.randomUUID().toString().getBytes(StandardCharsets.UTF_8)));
+            String uuid = UUID.randomUUID().toString();
+            socketChannel.write(ByteBuffer.wrap(uuid.getBytes(StandardCharsets.UTF_8)));
             byteBuffer.clear();
             int readable = socketChannel.read(byteBuffer);
             System.out.println(new String(byteBuffer.array(), 0, readable));

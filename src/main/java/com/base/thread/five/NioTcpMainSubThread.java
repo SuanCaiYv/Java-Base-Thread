@@ -102,7 +102,7 @@ public class NioTcpMainSubThread {
     }
 
     /**
-     * 处理新的连接，生成SocketChannel并选择某一个Worker提交
+     * 处理新的连接，生成SocketChannel并选择某一个Worker提交。
      */
     private static class Boss implements Runnable {
 
