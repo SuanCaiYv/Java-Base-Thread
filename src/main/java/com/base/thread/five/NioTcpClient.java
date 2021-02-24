@@ -22,7 +22,10 @@ public class NioTcpClient {
             int readable = socketChannel.read(byteBuffer);
             System.out.println(new String(byteBuffer.array(), 0, readable));
         }
-        new Scanner(System.in).nextLine();
+        socketChannel.shutdownInput();
+        socketChannel.shutdownOutput();
+        socketChannel.close();
+        // new Scanner(System.in).nextLine();
 //        Scanner scanner = new Scanner(System.in);
 //        System.out.println("请输入:");
 //        String str = scanner.nextLine();

@@ -152,6 +152,13 @@ public class NioTcpSingleThread {
             SocketChannel socketChannel = (SocketChannel) socketSelectionKey.channel();
             if (!socketChannel.isOpen()) {
                 System.out.println("连接已关闭");
+                try {
+                    socketChannel.shutdownInput();
+                    socketChannel.shutdownOutput();
+                    socketChannel.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
                 return ;
             }
             if (socketSelectionKey.isReadable()) {

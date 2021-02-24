@@ -168,13 +168,21 @@ public class NioTcpMultiThread {
         public void run() {
             try {
                 SocketChannel socketChannel = (SocketChannel) socketSelectionKey.channel();
-                String value = null;
+                String value;
                 reentrantLock.lock();
-                int readable = socketChannel.read(byteBuffer);
-                if (readable == 0) {
-                    System.out.println("读到空请求");
+                if (socketChannel.isOpen()) {
+                    int readable = socketChannel.read(byteBuffer);
+                    if (readable == 0) {
+                        value = null;
+                        // System.out.println("读到空请求");
+                    } else if (readable < 0) {
+                        value = null;
+                        shutdownSocketChannel(socketChannel);
+                    } else {
+                        value = new String(byteBuffer.array(), 0, readable);
+                    }
                 } else {
-                    value = new String(byteBuffer.array(), 0, readable);
+                    value = null;
                 }
                 reentrantLock.unlock();
                 if (value == null) {
@@ -204,9 +212,22 @@ public class NioTcpMultiThread {
                 SocketChannel socketChannel = (SocketChannel) socketSelectionKey.channel();
                 LinkedBlockingQueue<DataLoad> queue = dataLoads.get(socketChannel);
                 String value = "Server get: " + dataLoads.get(socketChannel).take().getStringValue();
-                socketChannel.write(ByteBuffer.wrap(value.getBytes(StandardCharsets.UTF_8)));
+                if (socketChannel.isOpen())
+                    socketChannel.write(ByteBuffer.wrap(value.getBytes(StandardCharsets.UTF_8)));
+                else {
+                    shutdownSocketChannel(socketChannel);
+                }
             } catch (IOException | InterruptedException ignored) {
             }
+        }
+    }
+
+    private static void shutdownSocketChannel(SocketChannel socketChannel) {
+        try {
+            socketChannel.shutdownInput();
+            socketChannel.shutdownOutput();
+            socketChannel.close();
+        } catch (IOException ignored) {
         }
     }
 }
