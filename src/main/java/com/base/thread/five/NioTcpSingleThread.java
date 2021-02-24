@@ -11,9 +11,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.*;
 import java.nio.channels.spi.AbstractSelectableChannel;
 import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.Set;
+import java.util.*;
 
 /**
  * @author 十三月之夜
@@ -24,9 +22,9 @@ public class NioTcpSingleThread {
         NioTcpSingleThread.Server.builder().build().run();
     }
 
-    private static final HashMap<SocketChannel, DataLoad> dataLoads = new LinkedHashMap<>();
+    private static final HashMap<SocketChannel, List<DataLoad>> dataLoads = new LinkedHashMap<>();
 
-    private static final ByteBuffer byteBuffer = ByteBuffer.allocate(1024 * 5);
+    private static final ByteBuffer byteBuffer = ByteBuffer.allocate(1024 * 1024);
 
     @Data
     @Builder
@@ -138,6 +136,11 @@ public class NioTcpSingleThread {
         }
     }
 
+    /**
+     * "写"操作依赖于"读"操作读取到的数据，所以"写"之后不能再次"写"，必须"读"或"关闭"。
+     * <br/>
+     * "读"操作之后可以继续"读"而无需等待"写完成"，所以"写完"可以把感兴趣类型设置为"读"|"写"而不是单单的"写"。
+     */
     @Data
     @Builder
     private static class Handler implements Runnable {
@@ -147,12 +150,9 @@ public class NioTcpSingleThread {
         @Override
         public void run() {
             SocketChannel socketChannel = (SocketChannel) socketSelectionKey.channel();
-            if (!socketSelectionKey.isValid()) {
-                try {
-                    socketChannel.close();
-                } catch (IOException ignored) {
-                    ;
-                }
+            if (!socketChannel.isOpen()) {
+                System.out.println("连接已关闭");
+                return ;
             }
             if (socketSelectionKey.isReadable()) {
                 System.out.println("读事件发生，准备读...");
@@ -166,6 +166,7 @@ public class NioTcpSingleThread {
                 socketSelectionKey.selector().wakeup();
             }
             if (socketSelectionKey.isWritable()) {
+                System.out.println("写事件发生，准备写...");
                 Writer.builder()
                         .socketChannel(socketChannel)
                         .build()
@@ -194,7 +195,8 @@ public class NioTcpSingleThread {
                 DataLoad dataLoad = DataLoad.builder()
                         .stringValue(value)
                         .build();
-                dataLoads.put(socketChannel, dataLoad);
+                List<DataLoad> tmp = dataLoads.computeIfAbsent(socketChannel, k -> new LinkedList<>());
+                tmp.add(dataLoad);
             } catch (IOException ignored) {
             }
         }
@@ -209,11 +211,10 @@ public class NioTcpSingleThread {
         @Override
         public void run() {
             try {
-                System.out.println("写事件发生，准备写...");
-                String value = "Server get: " + dataLoads.get(socketChannel).getStringValue();
+                String value = "Server get: " + dataLoads.get(socketChannel).get(0).getStringValue();
+                dataLoads.get(socketChannel).remove(0);
                 socketChannel.write(ByteBuffer.wrap(value.getBytes(StandardCharsets.UTF_8)));
             } catch (IOException ignored) {
-                ;
             }
         }
     }
