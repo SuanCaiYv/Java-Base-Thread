@@ -194,6 +194,64 @@ public void run() {
  * 如果一个操作依赖另一个操作的完成，那就不能简单的开启多线程，但是如果又想实现多线程来增加性能(尤其在多核CPU上)，可以实现流水线思想。
  * A->B->C，这样的流水线执行，彼此顺序无法被打乱，那么可以让线程A执行任务A，让线程B执行任务B，线程C执行任务C。一开始B和C处于睡眠状态。在A执行完毕后，把执行结果发给B并唤醒B，B执行完毕进入睡眠并把结果发给C，唤醒C。
 ### 5.7. 并行搜索
- * 对于一个数组的检索，如果数组本身是乱序的，则只能老老实实地从头到尾检索，但是可以利用多线程，让每个线程检索一小部分，以提交检索效率。
+ * 对于一个数组的检索，如果数组本身是乱序的，则只能老老实实地从头到尾检索，但是可以利用多线程，让每个线程检索一小部分，以提高检索效率。
  * 这里会用到Future来实现结果的保存，以及一个线程安全的全局变量来记录检索结果，用来当其他线程检索成功时可以直接返回，而不用继续检索。
 ### 5.10. NIO
+ * 详见Demo
+
+Java NIO处理网络的核心组件只有四个：Channel，Selector，SelectionKey和java.nio.Buffer。
+
+说一下ServerSocketChannel，SocketChannel，Selector和SelectionKey之间的关系。 ServerSocketChannel和SocketChannel不说了，无非就是一个用来在服务端建立连接，一个处理连接(实际I/O交互)的区别，在这里统称为AbstractSelectableChannel，也就是它俩都继承的类。
+
+Selector.select()调用系统调用，轮询端口，记录已注册的AbstractSelectableChannel感兴趣的事件，如果发生了所有已注册的AbstractSelectableChannel感兴趣的事件之一的话，就返回。否则阻塞。 对于AbstractSelectableChannel来说，怎么让Selector帮自己记录并轮询自己感兴趣的事件呢？答案是：注册到Selector上即可，同时设置感兴趣的事件类型。
+
+在注册成功后，会返回一个SelectionKey类型的变量，通过它，可以操作AbstractSelectableChannel和Selector。SelectionKey本身就是AbstractSelectableChannel和它注册到的Selector的凭证。 就像是订单一样，记录着它们俩的关系，所以在注册成功的后续操作里，一般都是用SelectionKey来实现的。同时，SelectionKey还有一个attachment()方法，可以获取附加到它上面的对象。 一般我们用这个附属对象来处理当前SelectionKey所包含的AbstractSelectableChannel和Selector的实际业务。
+
+刚才说到了Selector.select()，它会一直阻塞直到发生了感兴趣的事件，但是有时候我们这边可以确定某一事件马上或已经发生，就可以调用Selector.wakeup()方法，让Selector.select()立即返回，然后获取 SelectionKey集合也好，重新Selector.select()(这已经是下一次循环了)也罢。
+
+注意！！！如果某一个AbstractSelectableChannel在同一个Selector上注册了两个不同的感兴趣的事件类型，那么返回的两个SelectionKey是没有任何关系的。虽然可以通过SelectionKey再次修改 AbstractSelectableChannel感兴趣的事件类型。SelectionKey只在注册时生成返回，所以有(Channel + Selector) = SelectionKey。但是吧，啧，注册多个时会卡死，所以千万不要同一个Channel和同一个Selector注册多个！！
+### 5.11. AIO
+ * 详见Demo
+ * 顺带一提，AIO是全异步的，什么意思呢？就是建立连接后立即返回，至于连接后干啥，那属于异步调用的事，只管提供一个Handler，在连接建立后供其调用即可。
+ * 连接建立后的读，写操作也是异步的，要求读提供一个缓冲区，会在读完了后通知提前设置好的Handler，写同理，提供一个已经设置好写回数据的缓冲区，和一个Handler，并在写操作完成时调用Handler。
+## 6. JDK流式编程和并发
+### 6.1. 函数式编程
+#### 6.1.1. 函数作为一等公民
+ * 一个函数的返回值可以作为另一个函数的参数，多个函数之间连接起来实现复杂功能，但每个函数仅执行一小部分。
+#### 6.1.2. 无副作用
+ * 要求函数尽量不改变外部变量，或者限制其更改范围，尽可能把影响控制到最小。
+#### 6.1.3. 声明式的
+ * 声明式要求对于函数编程，不需要创建变量，指出数据变更，结构，循环，跳转，而仅仅在参数里支持想要什么即可。
+#### 6.1.4. 不变的对象
+ * 函数式编程会尽可能不修改输入的值，即使在函数体中输出了新的值，但是参数也是不变的。
+#### 6.1.5. 易于并行
+ * 所谓线程安全无非就是多线程时，对象会被写坏，但是因为函数式编程，入参不可变，所以便没有线程安全这一说，易于并行运行。
+#### 6.4.6. 更少的代码
+### 6.2. 函数式编程基础
+#### 6.2.1. FunctionalInterface注解
+ * 这个注解标注的接口会指明它是一个函数式接口。
+ * 函数式接口指的是只有一个抽象方法的接口，由Object实现的方法和有默认实现的方法不叫抽象方法。
+ * 如果某个接口只有一个抽象方法，即使没有这个接口也可以认为是函数式接口。
+#### 6.2.2. Lambda表达式
+ * Lambda表达式没有方法名，只有参数和返回值。
+ * Lambda一样无法更新外部变量的值。
+#### 6.2.3. 方法引用
+ * 即[类名/实例方法/超类/类型]::[方法名/new]
+### 6.3. 并行流
+ * 使用parallel类的方法可以实现并行流，每个流运行在一个线程上。
+### 6.4. CompletableFuture接口
+#### 6.4.1. 完成后通知我
+ * 详见Demo
+#### 6.4.2. 异步执行
+ * 详见Demo
+#### 6.4.3. 流式调用
+ * 详见Demo
+#### 6.4.4. 异常处理
+ * 详见Demo
+#### 6.4.5. 组合多个CompletableFuture
+ * 详见Demo
+#### 6.4.6. 支持Timeout的CompletableFuture
+ * 详见Demo
+### 6.5. 改进的读写锁: StampedLock
+ * 读写锁使用的是悲观策略，认为读写之间需要加锁，但是StampedLock使用的是乐观锁，读写之间不必加锁，读操作可以通过不停尝试地方式获取想要的值。
+ * 
